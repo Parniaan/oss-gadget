@@ -7,6 +7,7 @@ namespace Microsoft.CST.OpenSource.FindSquats
     using Microsoft.CodeAnalysis.Sarif;
     using Microsoft.CST.OpenSource.Shared;
     using Mutators;
+    using Extensions;
     using Newtonsoft.Json;
     using PackageManagers;
     using PackageUrl;
@@ -89,8 +90,64 @@ namespace Microsoft.CST.OpenSource.FindSquats
             });
         }
 
+        public IEnumerable<FindPackageSquatResult> FindExistingSquatsFromFile(PackageURL purl, IDictionary<string, IList<Mutation>>? candidateMutations, List<string> allPackages, MutateOptions? options = null)
+        {
+            if (purl.Name is null || purl.Type is null)
+            {
+                yield break;
+            }
+
+            if (candidateMutations is not null)
+            {
+                foreach ((string candidatePurlString, IList<Mutation> mutations) in candidateMutations)
+                {
+                    // Create the purl from the mutation to see if it exists.
+                    PackageURL candidatePurl = new(candidatePurlString);
+                    FindPackageSquatResult? res = null;
+
+                    var pkgName = candidatePurl.GetFullName();
+
+                    if (allPackages.Contains(pkgName))
+                    {
+                        // The candidate mutation exists on the package registry.
+                        res = new FindPackageSquatResult(
+                            mutatedPackageName: candidatePurl.GetFullName(),
+                            mutatedPackageUrl: candidatePurl,
+                            originalPackageUrl: purl,
+                            mutations: mutations);
+
+                        yield return res;
+                    }
+                }
+
+            }
+        }
+
         public async Task<(string output, int numSquats)> RunAsync(Options options)
         {
+            List<string> allPackages = new List<string>();
+            List<string> csvs = new List<string> { 
+                @"../oss-find-squats-lib/pypi_popular.csv",
+                @"../oss-find-squats-lib/pypi_unpopular.csv"
+            };
+
+            foreach (string csvFile in csvs)
+            {
+                using(var reader = new StreamReader(csvFile))
+                {
+                    // skip headers
+                    reader.ReadLine();
+
+                    while (!reader.EndOfStream)
+                    {
+                        var line = reader.ReadLine();
+                        var values = line.Split(',');
+
+                        allPackages.Add(values[0]);
+                    }
+                }
+            }
+
             IOutputBuilder? outputBuilder = SelectFormat(options.Format);
             int foundSquats = 0;
             MutateOptions? checkerOptions = new()
@@ -110,7 +167,7 @@ namespace Microsoft.CST.OpenSource.FindSquats
 
                 IDictionary<string, IList<Mutation>>? potentialSquats = findPackageSquats.GenerateSquatCandidates(options: checkerOptions);
 
-                await foreach (FindPackageSquatResult? potentialSquat in findPackageSquats.FindExistingSquatsAsync(potentialSquats, checkerOptions))
+                foreach (FindPackageSquatResult? potentialSquat in FindExistingSquatsFromFile(findPackageSquats.PackageUrl,  potentialSquats, allPackages, checkerOptions))
                 {
                     foundSquats++;
                     if (!options.Quiet)

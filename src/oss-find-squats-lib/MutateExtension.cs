@@ -43,7 +43,9 @@ namespace Microsoft.CST.OpenSource.FindSquats.ExtensionMethods
             new SuffixMutator(),
             new SwapOrderOfLettersMutator(),
             new UnicodeHomoglyphMutator(),
-            new VowelSwapMutator()
+            new VowelSwapMutator(),
+            new PackageTokenMutator()
+
         };
 
         /// <summary>

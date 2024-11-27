@@ -94,6 +94,11 @@ namespace Microsoft.CST.OpenSource.FindSquats.Mutators
         /// <summary>
         /// The <see cref="VowelSwapMutator"/> mutator.
         /// </summary>
-        VowelSwap
+        VowelSwap,
+
+        /// <summary>
+        /// The <see cref="PackageTokenMutator"/> mutator.
+        /// </summary>
+        PackageToken
     }
 }
