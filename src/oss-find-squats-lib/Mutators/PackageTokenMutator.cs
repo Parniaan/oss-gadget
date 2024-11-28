@@ -1,104 +1,201 @@
-// Copyright (c) Microsoft Corporation. Licensed under the MIT License.
-
 namespace Microsoft.CST.OpenSource.FindSquats.Mutators
 {
-    using Helpers;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System;
-    using System.IO;
     using Newtonsoft.Json;
+    using PackageUrl;
+    using System;
+    using System.Collections.Generic;
+    using System.IO;
+    using System.Linq;
 
     /// <summary>
-    /// Generates mutations for if a suffix was added to, or removed from the string.
-    /// By default, we check for these prefixes: .
+    /// Implements Prefix/Suffix Augmentation for adversarial package detection.
     /// </summary>
     public class PackageTokenMutator : IMutator
     {
         public MutatorType Kind { get; } = MutatorType.PackageToken;
-        private List<string> _tokens = new() {};
-        private Dictionary<string, float> PKG_TOKEN_TO_RANK;
-        private const float PopularityThreshold = 0.15f; // Hardcoded popularity threshold
-        private const string JsonFilePath = "../token_data.json"; // Hardcoded JSON file path
 
-        public PrefixSuffixAugmentation()
+        public Dictionary<string, float> PKG_TOKEN_TO_RANK { get; private set; }
+        public List<string> PKG_TOKENS { get; private set; }
+        public List<string> EN_TOKENS_BEFORE_LEMMATIZER { get; private set; }
+        public List<string> EN_TOKENS_AFTER_LEMMATIZER { get; private set; }
+        public List<string> TECH_TOKENS { get; private set; }
+
+        private const float PopularityThreshold = 0.15f; // Threshold for uncommon tokens
+        private string JsonFilePath = "absolute_path_to_token_data"; // This line should be replaced with the token_data.json in data/toeknization folder
+
+        public PackageTokenMutator()
         {
-            // Load PKG_TOKEN_TO_RANK from the JSON file
-            var jsonData = File.ReadAllText(JsonFilePath);
-            var tokenData = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonData);
-            PKG_TOKEN_TO_RANK = JsonConvert.DeserializeObject<Dictionary<string, float>>(tokenData["PKG_TOKEN_TO_RANK"].ToString());
+            LoadTokenData();
         }
-
-        public int Detect(string basePkg, string adversarialPkg)
+  
+        private void LoadTokenData()
         {
-            // Check for minimum length
-            if (basePkg.Length < 3 || adversarialPkg.Length < 3) return 0;
-
-            // Normalize by removing underscores
-            string normalizedBase = basePkg.Replace("_", "");
-            string normalizedAdversarial = adversarialPkg.Replace("_", "");
-
-            // Check prefix/suffix conditions
-            if (adversarialPkg.Contains(basePkg) &&
-                normalizedAdversarial.Length > normalizedBase.Length &&
-                normalizedAdversarial.Length <= normalizedBase.Length * 2)
+            if (!File.Exists(JsonFilePath))
             {
-                bool startsWithOrEndsWith = adversarialPkg.StartsWith(basePkg) || adversarialPkg.EndsWith(basePkg);
+                throw new FileNotFoundException($"Token data file not found: {JsonFilePath}");
+            }
 
-                if (startsWithOrEndsWith && IsPopularityBelowThreshold(basePkg))
+            try
+            {
+                var jsonData = File.ReadAllText(JsonFilePath);
+
+                // Deserialize the entire JSON structure into a dynamic object
+                var jsonObject = JsonConvert.DeserializeObject<dynamic>(jsonData);
+
+                // Load PKG_TOKEN_TO_RANK
+                if (jsonObject.PKG_TOKEN_TO_RANK != null)
                 {
-                    return 1;
+                    PKG_TOKEN_TO_RANK = JsonConvert.DeserializeObject<Dictionary<string, float>>(Convert.ToString(jsonObject.PKG_TOKEN_TO_RANK));
+                }
+                else
+                {
+                    throw new InvalidOperationException("Missing 'PKG_TOKEN_TO_RANK' key in token data.");
+                }
+
+                // Load PKG_TOKENS
+                if (jsonObject.PKG_TOKENS != null)
+                {
+                    PKG_TOKENS = JsonConvert.DeserializeObject<List<string>>(Convert.ToString(jsonObject.PKG_TOKENS));
+                }
+                else
+                {
+                    throw new InvalidOperationException("Missing 'PKG_TOKENS' key in token data.");
+                }
+
+                // Load EN_TOKENS_BEFORE_LEMMATIZER
+                if (jsonObject.EN_TOKENS_BEFORE_LEMMATIZER != null)
+                {
+                    EN_TOKENS_BEFORE_LEMMATIZER = JsonConvert.DeserializeObject<List<string>>(Convert.ToString(jsonObject.EN_TOKENS_BEFORE_LEMMATIZER));
+                }
+                else
+                {
+                    throw new InvalidOperationException("Missing 'EN_TOKENS_BEFORE_LEMMATIZER' key in token data.");
+                }
+
+                // Load EN_TOKENS_AFTER_LEMMATIZER
+                if (jsonObject.EN_TOKENS_AFTER_LEMMATIZER != null)
+                {
+                    EN_TOKENS_AFTER_LEMMATIZER = JsonConvert.DeserializeObject<List<string>>(Convert.ToString(jsonObject.EN_TOKENS_AFTER_LEMMATIZER));
+                }
+                else
+                {
+                    throw new InvalidOperationException("Missing 'EN_TOKENS_AFTER_LEMMATIZER' key in token data.");
+                }
+
+                // Load TECH_TOKENS
+                if (jsonObject.TECH_TOKENS != null)
+                {
+                    TECH_TOKENS = JsonConvert.DeserializeObject<List<string>>(Convert.ToString(jsonObject.TECH_TOKENS));
+                }
+                else
+                {
+                    throw new InvalidOperationException("Missing 'TECH_TOKENS' key in token data.");
                 }
             }
-            return 0;
-        }
-
-        // private bool IsPopularityBelowThreshold(string basePkg)
-        // {
-        //     // Convert base package into tokens (simulated here by splitting by non-alphanumeric characters)
-        //     var tokens = basePkg.Split(new[] { '_', '-', '.' }, StringSplitOptions.RemoveEmptyEntries);
-
-        //     // Check if all tokens have popularity below the threshold
-        //     return tokens.All(token =>
-        //         PKG_TOKEN_TO_RANK.ContainsKey(token) ? PKG_TOKEN_TO_RANK[token] < PopularityThreshold : true);
-        // }
-        // /// <summary>
-        // /// Initializes a <see cref="PackageTokenMutator"/> instance.
-        // /// Optionally takes in a additional Tokens, or a list of overriding Tokens to replace the default list with.
-        // /// </summary>
-        // /// <param name="additionalTokens">An optional parameter for extra Tokens.</param>
-        // /// <param name="overrideTokens">An optional parameter for list of Tokens to replace the default list with.</param>
-        public PackageTokenMutator(string[]? additionalTokens = null, string[]? overrideTokens = null, string[]? skipTokens = null)
-        {
-            if (overrideTokens != null)
+            catch (JsonReaderException ex)
             {
-                _tokens = overrideTokens.ToList();
-            }
-            if (additionalTokens != null)
-            {
-                _tokens.AddRange(additionalTokens);
-            }
-            if (skipTokens != null)
-            {
-                _tokens.RemoveAll(skipTokens.Contains);
+                throw new InvalidOperationException($"Error parsing token data file: {JsonFilePath}. Check for JSON syntax issues. Error: {ex.Message}", ex);
             }
         }
-        
+
+        /// <summary>
+        /// Generates mutations by adding prefixes or suffixes to the target package.
+        /// </summary>
+        /// <param name="arg">The input package URL string.</param>
+        /// <returns>A list of mutations based on prefix/suffix augmentation rules.</returns>
         public IEnumerable<Mutation> Generate(string arg)
-        { 
-            var addedTokens = _tokens.Select(s => new Mutation(
-                    mutated: string.Concat(arg, s),
-                    original: arg,
-                    mutator: Kind,
-                    reason: $"Token Added: {s}"));
-            
-            var removedTokens = _tokens.Where(arg.EndsWith).Select(s => new Mutation(
-                mutated: arg.ReplaceAtEnd(s, string.Empty),
-                original: arg,
-                mutator: Kind,
-                reason: $"Token Removed: {s}"));
+        {
 
-            return addedTokens.Concat(removedTokens);
+            // Extract the package name from the purl
+            string targetName = arg;
+            if (string.IsNullOrEmpty(targetName) || targetName.Length <= 3)
+            {
+                yield break; // Skip if the target name is too short
+            }
+
+            // Ensure all tokens in the target package are uncommon
+            var targetTokens = targetName.Split('-');
+            if (!targetTokens.All(IsUncommonToken))
+            {
+                yield break; // Skip if not all tokens are uncommon
+            }
+
+            // Generate confuser package names by adding prefixes and suffixes
+            var confuserNames = GenerateConfuserNames(targetName);
+
+            foreach (var confuser in confuserNames)
+            {
+
+                if (IsValidConfuser(confuser, targetName))
+                {
+                    yield return new Mutation(
+                        mutated: confuser,
+                        original: targetName,
+                        mutator: Kind,
+                        reason: $"Confuser package generated: {confuser}");
+                }
+            }
+        }
+
+        private bool IsUncommonToken(string token)
+        {
+            return PKG_TOKEN_TO_RANK.TryGetValue(token, out var rank) && rank < PopularityThreshold;
+        }
+
+        private IEnumerable<string> GenerateConfuserNames(string targetName)
+        {
+            // Load all tokens from token data
+            var tokens = PKG_TOKEN_TO_RANK.Keys;
+
+            // Add prefixes
+            foreach (var prefix in tokens)
+            {
+                
+                yield return prefix + "-" + targetName;
+            }
+
+            // Add suffixes
+            foreach (var suffix in tokens)
+            {
+                yield return targetName + "-" + suffix;
+            }
+
+            foreach (var prefix in tokens)
+            {
+                yield return prefix + targetName;
+            }
+
+            // Add suffixes without hyphen
+            foreach (var suffix in tokens)
+            {
+                yield return targetName + suffix;
+            }
+        }
+
+        private bool IsValidConfuser(string confuser, string target)
+        {
+
+
+
+            // Ensure the confuser contains the target as a substring
+            if (!confuser.Contains(target))
+            {
+                return false;
+            }
+
+            // Ensure the length of both the confuser and target names is greater than 3
+            if (confuser.Length <= 3 || target.Length <= 3)
+            {
+                return false;
+            }
+
+            // Ensure the confuser's length is less than twice the target's length
+            if (confuser.Length >= 2 * target.Length)
+            {
+                return false;
+            }
+
+            return true;
         }
     }
 }
