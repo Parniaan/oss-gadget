@@ -89,3 +89,10 @@ provided by the bot. You will only need to do this once across all repos using o
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+
+### New Contributions:
+
+- Added [data](https://github.com/Parniaan/oss-gadget/tree/main/src/data) directory that includes pypi and npm popular and unpopular packages and the json file extracted from Typomind as the tokenization data
+- Modified [FindSquatsTool.cs](https://github.com/Parniaan/oss-gadget/blob/main/src/oss-find-squats/FindSquatsTool.cs) to accept our compiled lists for pypi and npm
+- Added [PackageTokenMutator.cs](src/oss-find-squats-lib/Mutators/PackageTokenMutator.cs) as a new mutator for detecting prefix/suffix augmentations based on the given algorithm and rule in Typomind paper.
+
