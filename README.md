@@ -97,7 +97,7 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 - Added [PackageTokenMutator.cs](src/oss-find-squats-lib/Mutators/PackageTokenMutator.cs) as a new mutator for detecting prefix/suffix augmentations based on the given algorithm and rule in Typomind paper.
 - To use the tool based on our added features these modifications should be applied to the code:
     - In [FindSquatsTool.cs](https://github.com/Parniaan/oss-gadget/blob/main/src/oss-find-squats/FindSquatsTool.cs) the absoulte path to pypi or npm packages should be added to the code - check placeholder instead of the following placeholders in the code:
-`
+```
    List<string> allPackages = new List<string>();
             List<string> csvs = new List<string> { 
                 //Should be replace with absolute path to pypi_popular.csv and pypi_unpopular.csv files 
@@ -105,7 +105,7 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
                 // @"<path-to-pypi-unpopular-csv-file>"
                 // @"<path-to-pypi-popular-csv-file>"
             };
-`
+```
     - In [PackageTokenMutator.cs](src/oss-find-squats-lib/Mutators/PackageTokenMutator.cs) the absolute path to the [token_data.json](src/data/toeknization/token_data.json) should be added to the following line
 ` private string JsonFilePath = "absolute_path_to_token_data"; `
 
