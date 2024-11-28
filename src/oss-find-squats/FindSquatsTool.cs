@@ -127,8 +127,10 @@ namespace Microsoft.CST.OpenSource.FindSquats
         {
             List<string> allPackages = new List<string>();
             List<string> csvs = new List<string> { 
-                @"../oss-find-squats-lib/pypi_popular.csv",
-                @"../oss-find-squats-lib/pypi_unpopular.csv"
+                //Should be replace with absolute path to pypi_popular.csv and pypi_unpopular.csv files 
+                // or npm_popular.csv and npm_unpopular.csv files in the data/npm directory or data/pypi directory
+                // @"<path-to-pypi-unpopular-csv-file>"
+                // @"<path-to-pypi-popular-csv-file>"
             };
 
             foreach (string csvFile in csvs)
