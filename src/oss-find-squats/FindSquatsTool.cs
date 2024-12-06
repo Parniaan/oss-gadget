@@ -131,6 +131,8 @@ namespace Microsoft.CST.OpenSource.FindSquats
                 // or npm_popular.csv and npm_unpopular.csv files in the data/npm directory or data/pypi directory
                 // @"<path-to-pypi-unpopular-csv-file>"
                 // @"<path-to-pypi-popular-csv-file>"
+                @"/Users/pari/Documents/UCDavis/Courses/Fall24/ECS235/project/ossgadget-new-feature/oss-gadget/src/data/pypi/pypi_popular.csv",
+                @"/Users/pari/Documents/UCDavis/Courses/Fall24/ECS235/project/ossgadget-new-feature/oss-gadget/src/data/pypi/pypi_unpopular.csv"
             };
 
             foreach (string csvFile in csvs)
