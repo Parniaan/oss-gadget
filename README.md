@@ -108,4 +108,8 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 
 ```
   - In [PackageTokenMutator.cs](src/oss-find-squats-lib/Mutators/PackageTokenMutator.cs) the absolute path to the [token_data.json](src/data/toeknization/token_data.json) should be added to the following line
-```private string JsonFilePath = "absolute_path_to_token_data"; ```
+
+```
+    private string JsonFilePath = "absolute_path_to_token_data";
+```
+
