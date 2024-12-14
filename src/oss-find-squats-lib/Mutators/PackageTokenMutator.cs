@@ -134,24 +134,28 @@ namespace Microsoft.CST.OpenSource.FindSquats.Mutators
             var lenCount = passes.Select(p => (Segments: p, Length: p.Count)).ToList();
             var countVals = lenCount.Select(l => l.Length).ToList();
             var lenFreq = countVals.GroupBy(l => l).ToDictionary(g => g.Key, g => g.Count());
+            Console.WriteLine($"len_freq: {string.Join(", ", lenFreq)}");
             int maxLenFreq = lenFreq.OrderByDescending(kv => kv.Value).FirstOrDefault().Key;
+            Console.WriteLine($"max_len_freq: {maxLenFreq}");
             // Console.WriteLine($"max_len_freq: {maxLenFreq}");
 
             // Check for ambiguity
             bool ambiguous = lenCount.Select(l => l.Length).Distinct().Count() > 2;
+            Console.WriteLine($"ambiguous: {ambiguous}");
             if (ambiguous)
             {
                 return new List<string> { target };
             }
 
             // Filter viable segmentations
+            foreach (var p in passes) Console.WriteLine($"p in passes: {string.Join(", ", p)}");
             var viable = passes
                 .Where(p => p.All(s => Corpora["all"].Contains(s)) && p.Count == maxLenFreq)
                 .Select(p => p)
                 .ToList();
 
             // Debugging output for viable candidates
-            // Console.WriteLine($"viable: {string.Join(" | ", viable.Select(v => string.Join(", ", v)))}");
+            Console.WriteLine($"viable: {string.Join(" | ", viable.Select(v => string.Join(", ", v)))}");
 
             if (!viable.Any())
             {
@@ -176,6 +180,10 @@ namespace Microsoft.CST.OpenSource.FindSquats.Mutators
 
         private List<string> SegmentForward(string target, Queue<string> corpusKeyQueue)
         {
+            int minSegmentLength = 2;
+            int targetLength = target.Length;
+            Console.WriteLine("==========  SegmentForward ========== ");
+            Console.WriteLine($"target: {target}");
             if (string.IsNullOrEmpty(target)) return new List<string>();
 
             if (!corpusKeyQueue.Any())
@@ -193,18 +201,36 @@ namespace Microsoft.CST.OpenSource.FindSquats.Mutators
 
             for (int offset = 0; offset < target.Length; offset++)
             {
-                for (int window = target.Length - offset; window >= 2; window--)
+                Console.WriteLine($"offset: {offset}");
+                if (offset < minSegmentLength) continue;
+                Console.WriteLine($"target.Length - offset: {target.Length - offset}");
+                for (int window = Math.Max(minSegmentLength, target.Length - offset); window >= minSegmentLength; window--)
                 {
+                    Console.WriteLine($"window: {window}");
+                    if (window > target.Length - offset) continue;
                     string frame = target.Substring(offset, window);
+                    Console.WriteLine($"frame: {frame}");
                     if (corpus.Contains(frame))
                     {
                         string postframe = target.Substring(offset + window);
+                        Console.WriteLine($"postframe: {postframe}");
                         var preframe = target.Substring(0, offset);
+                        Console.WriteLine($"preframe: {preframe}");
                         var segments = new List<string>();
+                        if (postframe.Length < minSegmentLength)
+                        {
+                            frame += postframe;
+                            postframe = "";
+                            
+                        }
+                        Console.WriteLine($"frame: {frame}");
                         if (!string.IsNullOrEmpty(preframe)) segments.Add(preframe);
-                        segments.Add(frame);
-                        segments.AddRange(SegmentForward(postframe, new Queue<string>(corpusKeyQueue)));
-                        return segments;
+                            segments.Add(frame);
+                            Console.WriteLine($"segments: {string.Join(", ", segments)}");
+                            segments.AddRange(SegmentForward(postframe, new Queue<string>(corpusKeyQueue)));
+                            Console.WriteLine($"segments after modification: {string.Join(", ", segments)}");
+                            return segments;
+                        
                     }
                 }
             }
@@ -214,6 +240,10 @@ namespace Microsoft.CST.OpenSource.FindSquats.Mutators
 
         private List<string> SegmentBackward(string target, Queue<string> corpusKeyQueue)
         {
+            int minSegmentLength = 2;
+            int targetLength = target.Length;
+            Console.WriteLine("==========  SegmentBackward ========== ");
+            Console.WriteLine($"target: {target}");
             if (string.IsNullOrEmpty(target)) return new List<string>();
 
             if (!corpusKeyQueue.Any())
@@ -229,24 +259,47 @@ namespace Microsoft.CST.OpenSource.FindSquats.Mutators
                 return new List<string> { target };
             }
 
-            for (int offset = target.Length - 1; offset >= 0; offset--)
+            for (int offset = targetLength - 1; offset >= 0; offset--)
             {
-                for (int window = offset + 1; window >= 2; window--)
+                // Skip short offsets
+                if (offset > 0 && offset < minSegmentLength) continue;
+
+                for (int window = Math.Max(minSegmentLength, offset + 1); window >= minSegmentLength; window--)
                 {
-                    string frame = target.Substring(offset - window + 1, window);
+                    // Extract the frame starting from the current offset
+                    string frame = target.Substring(Math.Max(0, offset - window + 1), Math.Min(window, offset + 1));
+
+                    // Check if the frame is valid
                     if (corpus.Contains(frame))
                     {
-                        string preframe = target.Substring(0, offset - window + 1);
+                        string preframe = offset - window + 1 > 0 ? target.Substring(0, offset - window + 1) : "";
+                        Console.WriteLine($"preframe: {preframe}");
+                        string postframe = offset + 1 < targetLength ? target.Substring(offset + 1) : "";
+                        Console.WriteLine($"postframe: {postframe}");
+                        // Combine postframe if it's too short
+                        if (postframe.Length < minSegmentLength)
+                        {
+                            frame = postframe + frame;
+                            postframe = "";
+                        }
+                        Console.WriteLine($"frame: {frame}");
+
+                        // Recursively process preframe and combine results
                         var segments = SegmentBackward(preframe, new Queue<string>(corpusKeyQueue));
                         segments.Add(frame);
+                        Console.WriteLine($"segments: {string.Join(", ", segments)}");
+                        if (!string.IsNullOrEmpty(postframe)) segments.Add(postframe);
+                        Console.WriteLine($"segments after modification: {string.Join(", ", segments)}");
                         return segments;
                     }
                 }
             }
 
-            return new List<string> { target };
+            // Fallback: if no valid segment found, continue with the next corpus key or return target
+            return corpusKeyQueue.Any()
+                ? SegmentBackward(target, corpusKeyQueue)
+                : new List<string> { target };
         }
-
 
 
   
@@ -348,23 +401,28 @@ namespace Microsoft.CST.OpenSource.FindSquats.Mutators
 
             // Extract the package name from the purl
             string targetName = arg;
-            // Console.WriteLine("targetName: " + targetName);
-            string replaced = ReplaceDelimiters(targetName, "-");
-            // Console.WriteLine($"Replaced: {replaced}");
-            var sequence = ToSequence(targetName);
-            // Console.WriteLine("Sequence: " + string.Join(", ", sequence));
-
-            var segmented = Segment(targetName);
-            // Console.WriteLine("Segmented: " + string.Join(", ", segmented));
-       
+                
             if (string.IsNullOrEmpty(targetName) || targetName.Length < 3)
             {
                 yield break; // Skip if the target name is too short
             }
+            Console.WriteLine("targetName: " + targetName);
+            string replaced = ReplaceDelimiters(targetName, "-");
+            Console.WriteLine($"Replaced: {replaced}");
+            var sequence = ToSequence(targetName);
+            Console.WriteLine("Sequence: " + string.Join(", ", sequence));
+            var segmented = sequence.SelectMany(t => Segment(t)).ToList();
+            
+            Console.WriteLine("Segmented: " + string.Join(", ", segmented));
+   
 
             // Ensure all tokens in the target package are uncommon
             var targetTokens = segmented;
-            // Console.WriteLine("targetTokens: " + string.Join(", ", targetTokens));
+            for (int i = 0; i < targetTokens.Count; i++)
+            {
+                Console.WriteLine("targetTokens: " + string.Join(", ", targetTokens[i]));
+            }
+
             if (!targetTokens.All(IsUncommonToken))
             {
                 // Console.WriteLine("targetTokens.All(IsUncommonToken): " + targetTokens.All(IsUncommonToken));

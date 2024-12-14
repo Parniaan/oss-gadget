@@ -90,7 +90,7 @@ namespace Microsoft.CST.OpenSource.FindSquats
             });
         }
 
-        public IEnumerable<FindPackageSquatResult> FindExistingSquatsFromFile(PackageURL purl, IDictionary<string, IList<Mutation>>? candidateMutations, List<string> allPackages, MutateOptions? options = null)
+        public IEnumerable<FindPackageSquatResult> FindExistingSquatsFromFile(PackageURL purl, IDictionary<string, IList<Mutation>>? candidateMutations, HashSet<string> unpopPackages, MutateOptions? options = null)
         {
             if (purl.Name is null || purl.Type is null)
             {
@@ -107,7 +107,7 @@ namespace Microsoft.CST.OpenSource.FindSquats
 
                     var pkgName = candidatePurl.GetFullName();
 
-                    if (allPackages.Contains(pkgName))
+                    if (unpopPackages.Contains(pkgName))
                     {
                         // The candidate mutation exists on the package registry.
                         res = new FindPackageSquatResult(
@@ -125,30 +125,34 @@ namespace Microsoft.CST.OpenSource.FindSquats
 
         public async Task<(string output, int numSquats)> RunAsync(Options options)
         {
-            List<string> allPackages = new List<string>();
-            List<string> csvs = new List<string> { 
-                //Should be replace with absolute path to pypi_popular.csv and pypi_unpopular.csv files 
-                // or npm_popular.csv and npm_unpopular.csv files in the data/npm directory or data/pypi directory
-                // @"<path-to-pypi-unpopular-csv-file>"
-                // @"<path-to-pypi-popular-csv-file>"
-                @"/Users/pari/Documents/UCDavis/Courses/Fall24/ECS235/project/ossgadget-new-feature/oss-gadget/src/data/pypi/pypi_popular.csv",
-                @"/Users/pari/Documents/UCDavis/Courses/Fall24/ECS235/project/ossgadget-new-feature/oss-gadget/src/data/pypi/pypi_unpopular.csv"
-            };
-
-            foreach (string csvFile in csvs)
+            HashSet<string> popPackages = new HashSet<string>();
+            HashSet<string> unpopPackages = new HashSet<string>();
+            
+            using(var reader = new StreamReader(@"/Users/pari/Documents/UCDavis/Courses/Fall24/ECS235/project/ossgadget-new-feature/oss-gadget/src/data/pypi/pypi_popular.csv"))
             {
-                using(var reader = new StreamReader(csvFile))
+                // skip headers
+                reader.ReadLine();
+
+                while (!reader.EndOfStream)
                 {
-                    // skip headers
-                    reader.ReadLine();
+                    var line = reader.ReadLine();
+                    var values = line.Split(',');
 
-                    while (!reader.EndOfStream)
-                    {
-                        var line = reader.ReadLine();
-                        var values = line.Split(',');
+                    popPackages.Add(values[0]);
+                }
+            }
 
-                        allPackages.Add(values[0]);
-                    }
+            using(var reader = new StreamReader(@"/Users/pari/Documents/UCDavis/Courses/Fall24/ECS235/project/ossgadget-new-feature/oss-gadget/src/data/pypi/pypi_unpopular.csv"))
+            {
+                // skip headers
+                reader.ReadLine();
+
+                while (!reader.EndOfStream)
+                {
+                    var line = reader.ReadLine();
+                    var values = line.Split(',');
+
+                    unpopPackages.Add(values[0]);
                 }
             }
 
@@ -158,9 +162,14 @@ namespace Microsoft.CST.OpenSource.FindSquats
             {
                 SleepDelay = options.SleepDelay
             };
-            foreach (string? target in options.Targets ?? Array.Empty<string>())
+
+            int counterP = 0, total = popPackages.Count;
+            foreach (string? target in popPackages)
             {
-                PackageURL? purl = new(target);
+                counterP += 1;
+
+                PackageURL? purl = new($"pkg:pypi/{target}");
+                Console.WriteLine($"Processing {target} ({counterP} / {total})...");
                 if (purl.Name is null || purl.Type is null)
                 {
                     Logger.Trace($"Could not generate valid PackageURL from { target }.");
@@ -171,7 +180,7 @@ namespace Microsoft.CST.OpenSource.FindSquats
 
                 IDictionary<string, IList<Mutation>>? potentialSquats = findPackageSquats.GenerateSquatCandidates(options: checkerOptions);
 
-                foreach (FindPackageSquatResult? potentialSquat in FindExistingSquatsFromFile(findPackageSquats.PackageUrl,  potentialSquats, allPackages, checkerOptions))
+                foreach (FindPackageSquatResult? potentialSquat in FindExistingSquatsFromFile(findPackageSquats.PackageUrl,  potentialSquats, unpopPackages, checkerOptions))
                 {
                     foundSquats++;
                     if (!options.Quiet)
@@ -200,7 +209,7 @@ namespace Microsoft.CST.OpenSource.FindSquats
                     else if (outputBuilder is StringOutputBuilder strob)
                     {
                         string? rulesString = string.Join(',', potentialSquat.Rules);
-                        strob.AppendOutput(new string[] { $"Potential Squat candidate '{ potentialSquat.MutatedPackageName }' detected. Generated by { rulesString }.{Environment.NewLine}" });
+                        strob.AppendOutput(new string[] { $"{target}: Potential Squat candidate '{ potentialSquat.MutatedPackageName }' detected. Generated by { rulesString }.{Environment.NewLine}" });
                     }
                     else
                     {
