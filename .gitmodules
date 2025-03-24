@@ -1,0 +1,3 @@
+[submodule "oss-dadget/analysis"]
+	path = oss-dadget/analysis
+	url = https://github.com/sarahayu/typosquat-project.git
