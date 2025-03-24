@@ -1,3 +1,6 @@
 [submodule "oss-dadget/analysis"]
 	path = oss-dadget/analysis
 	url = https://github.com/sarahayu/typosquat-project.git
+[submodule "typosquat-new-rules"]
+	path = typosquat-new-rules
+	url = https://github.com/sarahayu/typosquat-project.git
